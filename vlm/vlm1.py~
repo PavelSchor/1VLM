@@ -1,0 +1,176 @@
+from vortexLattice.vlmPanels import VlmPanel
+import numpy as np
+from utils.env import GlobalEnvironment
+from utils.transform import EulerMatrix
+from utils.b3Vect import B3vect 
+vect=B3vect()
+from vortexLattice.viewer import *
+
+class subSection(GlobalEnvironment):
+	def __init__(self):
+		self.nPanels=-1
+		self.panels={}
+	
+	def addPanel(self,panel):
+		self.nPanels=self.nPanels+1
+		self.panels[self.nPanels]=panel
+
+	def getPanelList(self):
+		return self.panels.keys()
+
+	def getNumberOfPanels(self):
+		return len(self.panels)
+
+
+	def getPanel(self,i):
+		return self.panels[i]
+
+	def getTotalForce(self):
+		f=np.zeros(3)
+		for i in self.getPanelList():
+			panelI=self.getPanel(i)
+			f=f+panelI.getForce()
+		return f
+
+			
+
+class GlobalDomain(GlobalEnvironment):
+	def __init__(self):
+		self.refPT=np.zeros(3)
+		self.regions={}
+		self.nReg=-1
+		self.nPan=0
+
+	def setRefPT(self,PT):
+		self.refPT=PT
+
+	def addRegion(self,reg):
+		self.nReg=self.nReg+1
+		self.regions[self.nReg]=reg
+		self.nPan=self.nPan+self.regions[self.nReg].getNumberOfPanels()
+	
+	def getRefPT(self):
+		return self.refPT
+
+	def getRegionList(self):
+		return self.regions.keys()
+
+	def getRegion(self,i):
+		return self.regions[i]
+
+	def getVelocityAtPoint(self,PT):
+		vel=self.getFreeVelocity()
+		for r in self.getRegionList():
+			nPan=self.getRegion(r).getNumberOfPanels()
+			ofs=self.getPanelOffset(r)	
+			for i in range(0,nPan):
+				panelI=self.getRegion(r).getPanel(i)	
+				vel=vel+panelI.getUVW(PT)
+		return vel
+
+	def getPanelOffset(self,i):
+		ofs=0
+		for i in range(0,i):
+			ofs=ofs+self.getRegion(i).getNumberOfPanels()
+		return ofs		
+
+	def solveAij(self):
+		vel=self.getFreeVelocity()
+		A=np.zeros((self.nPan,self.nPan))
+		B=np.zeros((self.nPan,1))
+		self.rgs={}
+		for r1 in self.getRegionList():
+			self.rgs[r1]={}
+			for r2 in self.getRegionList():
+				self.rgs[r1][r2]={}
+				ofsI=self.getPanelOffset(r1)
+				ofsJ=self.getPanelOffset(r2)
+				nPanI=self.getRegion(r1).getNumberOfPanels()
+				nPanJ=self.getRegion(r2).getNumberOfPanels()
+				for i in range(0,nPanI):
+					panelI=self.getRegion(r1).getPanel(i)
+					for j in range(0,nPanJ):
+						panelJ=self.getRegion(r2).getPanel(j)
+						vij=panelJ.getUVW(panelI.getCpoint())
+						A[i+ofsI][j+ofsJ]=np.dot(vij,panelI.getNV()) 
+						self.rgs[r1][r2]['A']=A
+					B[i+ofsI]=-np.dot(vel,panelI.getNV())
+		S=np.squeeze(np.linalg.solve(A,B))
+#		S=np.squeeze(np.linalg.lstsq(A,B)[0])
+
+		self.A=A
+		self.S=S
+		self.B=B
+		for r in self.getRegionList():
+			nPan=self.getRegion(r).getNumberOfPanels()
+			ofs=self.getPanelOffset(r)	
+			for i in range(0,nPan):
+				panelI=self.getRegion(r).getPanel(i)	
+				panelI.setG(S[ofs+i])
+			
+		for r in self.getRegionList():
+			nPan=self.getRegion(r).getNumberOfPanels()
+			ofs=self.getPanelOffset(r)
+			for i in range(0,nPan):	
+				panelI=self.getRegion(r).getPanel(i)
+				CPT=panelI.getCpoint()
+				velCPT=self.getVelocityAtPoint(CPT)
+				panelI.setGlobalVelocity(velCPT)
+				panelI.setForce()
+
+class VlmProblem(GlobalEnvironment):
+	def __init__(self):
+		self.vel=np.zeros(3)
+		self.velMagn=10.0
+		self.alpha=0.0
+		self.beta=0.0
+		self.rho=1.0
+		self.pressure=1.0	
+		self.dom1=GlobalDomain()
+
+	def setAlpha(self,a):
+		self.alpha=a
+	
+	def setBeta(self,b):
+		self.beta=b
+
+	def setVelocityMagn(self,v):
+		self.velMagn=v
+		vel=np.array([v,0.,0.])
+		a=self.getAlpha()
+		b=self.getBeta()
+		eMatrix=EulerMatrix(0.0,a,b)
+		self.setVelocity(eMatrix.transform(vel))
+	
+	def getAlpha(self):
+		return self.alpha
+
+	def getBeta(self):
+		return self.beta
+
+	def setVelocity(self,vel):
+		GlobalEnvironment.setFreeVelocity(vel)
+
+	def getVelocity(self):
+		return self.getFreeVelocity()
+	
+	def addRegion(self,reg):
+		self.dom1.addRegion(reg)
+		
+	def getSolution(self):
+		dom1=self.dom1
+		dom1.solveAij()
+
+	def plotResults(self):
+		self.view=PanelViewer3D()
+		dom1=self.dom1
+		for r in dom1.getRegionList():
+			nPan=dom1.getRegion(r).getNumberOfPanels()
+	
+			for i in range(0,nPan):
+				panelI=dom1.getRegion(r).getPanel(i)
+				self.view.addVlmPanel(panelI)
+				
+		self.view.drawQuads()
+		self.view.addWidgets({'showAxes':False,'showScalarBar':True,'showXYPlane':True,'showYZPlane':True,'showZXPlane':True})
+		self.view.show()

@@ -1,0 +1,2 @@
+ 
+python setupVLM1.py build_ext --inplace

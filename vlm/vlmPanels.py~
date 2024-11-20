@@ -1,0 +1,122 @@
+import numpy as np
+from vortexLattice.vortexLines import vortexLine 
+from utils.env import GlobalEnvironment
+from utils.b3Vect import B3vect 
+vect=B3vect()
+
+
+class VlmPanel(GlobalEnvironment):
+	def __init__(self,P1,P2,P3,P4):
+		self.forceVector=np.zeros(3)
+		self.G=1.0
+		self.P1=P1
+		self.P2=P2
+		self.P3=P3
+		self.P4=P4
+		
+		v12=vect.makeVect(P1,P2)
+		v13=vect.makeVect(P1,P3)
+		v14=vect.makeVect(P1,P4)
+		v23=vect.makeVect(P2,P3)
+		v24=vect.makeVect(P2,P4)
+		
+
+		p025a=P1+vect.setVectSize(v14,0.25*vect.vectorMagn(v14))
+		p025b=P2+vect.setVectSize(v23,0.25*vect.vectorMagn(v23))
+
+		p075a=P1+vect.setVectSize(v14,0.75*vect.vectorMagn(v14))
+		p075b=P2+vect.setVectSize(v23,0.75*vect.vectorMagn(v23))
+
+		cp=p075a+vect.makeVect(p075a,p075b)*0.5
+
+		gVect=vect.makeVect(p025a, p025b)		
+		self.gammaVector=gVect
+
+
+		self.controlPoint=cp
+		self.vortexPoint1=p025a
+		self.vortexPoint2=p025b
+
+		self.normalVect=vect.normal1Vect(v13,v24)
+
+		self.area=vect.vectorMagn(np.cross(v12,v14))
+
+		self.gVel=np.zeros(3)
+		self.pressureCoef=1.0
+		self.setWake(self.getFreeVelocity())
+
+
+	def setWake(self,vel):
+		kWake=10e10
+		self.vel=vel
+		self.vl0=vortexLine(self.getVortexPoint1(),self.getVortexPoint2())
+		self.vl1=vortexLine(self.getVortexPoint1()+vel*kWake,self.getVortexPoint1())
+		self.vl2=vortexLine(self.getVortexPoint2(),self.getVortexPoint2()+vel*kWake)
+
+	def setGlobalVelocity(self,vel):
+		self.gVel=vel
+
+	def getArea(self):
+		return self.area
+
+	def getGammaVector(self):
+		return self.gammaVector
+
+	def getGlobalVelocity(self):
+		return self.gVel
+
+	def setPressureCoef(self,cp):
+		self.pressureCoef=cp
+
+	def getPressureCoef(self):
+		return self.pressureCoef
+
+	def getGlobalVelocity(self):
+		return self.gVel
+
+	def getVortexPoint1(self):
+		return self.vortexPoint1
+
+	def getVortexPoint2(self):
+		return self.vortexPoint2
+
+	def getCpoint(self):
+		return self.controlPoint
+	
+	def getNV(self):
+		return self.normalVect
+
+	def setG(self,G):
+		self.G=G
+		self.vl0.setG(float(G))
+		self.vl1.setG(float(G))
+		self.vl2.setG(float(G))
+
+	def getG(self):
+		return self.G
+
+	def getUVW(self,PT):
+		uvw=np.zeros(3)
+		uvw=uvw+self.vl0.getUVW(PT)
+		uvw=uvw+self.vl1.getUVW(PT)
+		uvw=uvw+self.vl2.getUVW(PT)
+		
+		return uvw
+
+	def setForce(self):
+		vel=self.getGlobalVelocity()
+		gVec=self.getGammaVector()
+		gVecMagn=vect.vectorMagn(gVec)
+		velMagn=vect.vectorMagn(vel)
+		A=self.getArea()
+		FV=np.cross(gVec,vel)
+		force=self.getG()*gVecMagn*velMagn
+		FV=vect.setVectSize(FV,force)
+		cp=force/A
+		self.setPressureCoef(cp)
+		self.forceVector=FV	
+		self.dot=np.dot(self.gVel,self.normalVect)
+
+	def getForce(self):
+		return self.forceVector
+

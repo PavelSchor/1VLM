@@ -1,0 +1,286 @@
+#!/usr/bin/env python
+import sys
+sys.path.append( '../stochastic')
+import vtk
+import numpy as np
+from scipy import interpolate
+from vtk.util.colors import *
+
+class GraphicObject(object):
+	pass
+
+class PanelViewer3D(object):
+
+	def __init__(self):
+		self.output=GraphicObject()
+		self.output.quadCount=-1
+		self.output.quadl=[]
+		self.output.quads=vtk.vtkCellArray()
+		self.output.points = vtk.vtkPoints();
+
+		self.colors=vtk.vtkFloatArray()
+		self.scalingFactor=1.0
+		self.showCompass=True
+		self.showAxes=True
+		self.showScalarBar=True
+		self.showCaption=True
+		self.showXYPlane=True
+		self.showYZPlane=True
+		self.showZXPlane=True
+		self.xlabel='x'
+		self.ylabel='y'
+		self.zlabel='z'
+		self.xrange=None
+		self.yrange=None
+		self.zrange=None
+		self.nbSize=80
+		self.sampleSpacing=8.0
+		self.caption=''
+		self.camera = vtk.vtkCamera()
+
+		self.ren = vtk.vtkRenderer();
+		self.renWin = vtk.vtkRenderWindow();
+		self.renWin.AddRenderer(self.ren);
+		self.renWin.SetWindowName("DESICOS-viewer v0.1 ")
+		self.iren = vtk.vtkRenderWindowInteractor();
+		self.iren.SetRenderWindow(self.renWin);
+		style1 = vtk.vtkInteractorStyleTrackballCamera()
+		self.iren.SetInteractorStyle(style1)
+		self.ren.SetBackground(1, 1, 1);
+		self.renWin.SetSize(800, 600);
+
+	def show(self):
+		self.ren.ResetCamera()
+		self.iren.Initialize();
+		self.renWin.Render();
+		self.iren.Start();
+		self.close()
+
+
+	def close(self):
+		self.renWin.Finalize()
+		self.iren.TerminateApp(); 
+		del self.ren
+		del self.renWin 
+		del self.iren
+
+	def setCaption(self,text):
+		self.caption=text
+		self.renWin.SetWindowName("DESICOS-viewer v0.1 " +str(text))
+
+	def setScalingFactor(self,sf):
+		self.scalingFactor=sf
+
+	def setNeighborhoodSize(self,nbSize):
+		self.nbSize=nbSize
+
+	def setSampleSpacing(self,sampleSpacing):
+		self.sampleSpacing=sampleSpacing
+
+	def writeVTP(self,fname,i=0):
+		writer=vtk.vtkXMLPolyDataWriter()
+		writer.SetFileName(fname)
+		writer.SetInput(self.output)
+		writer.Write()
+
+	def addVlmPanel(self,panelI):
+		cp=panelI.getCpoint()
+		nv=panelI.getForce()
+		
+		ff=np.sqrt(nv[0]**2 + nv[1]**2 + nv[2]**2)
+		self.output.points.InsertNextPoint(panelI.P1)
+		self.output.points.InsertNextPoint(panelI.P2)
+		self.output.points.InsertNextPoint(panelI.P3)
+		self.output.points.InsertNextPoint(panelI.P4)
+
+		self.output.quadCount+=1
+		self.output.quadl.append(vtk.vtkQuad())
+		quad=self.output.quadl[self.output.quadCount]
+
+		qcnt=self.output.quadCount*4
+		quad.GetPointIds().SetId(0,qcnt+0)
+		quad.GetPointIds().SetId(1,qcnt+1)
+		quad.GetPointIds().SetId(2,qcnt+2)
+		quad.GetPointIds().SetId(3,qcnt+3)
+		
+		self.output.quads.InsertNextCell(self.output.quadl[self.output.quadCount])
+#		self.colors.InsertNextValue(ff)
+		self.colors.InsertNextValue(panelI.getPressureCoef())
+
+	def drawQuads(self):
+
+		print self.colors.GetRange()
+		self.output.polydata = vtk.vtkPolyData();
+		self.output.polydata.SetPoints(self.output.points)
+		self.output.polydata.SetPolys(self.output.quads)
+		self.output.polydata.GetCellData().SetScalars(self.colors)
+		self.output.polydata.Update()	 
+
+		self.lut=vtk.vtkLookupTable()
+		self.lut.SetNumberOfTableValues(100)
+		self.lut.SetTableRange(self.colors.GetRange())
+		self.lut.SetHueRange(0.667, 0.0)
+		self.lut.Build()
+
+		mapper = vtk.vtkPolyDataMapper();
+		mapper.SetLookupTable(self.lut)
+		mapper.InterpolateScalarsBeforeMappingOn()
+		mapper.SetInput(self.output.polydata)
+		mapper.SetInputConnection(self.output.polydata.GetProducerPort())
+#		mapper.SetScalarModeToUsePointData()
+		mapper.ScalarVisibilityOn();
+		mapper.SetScalarRange(self.colors.GetRange())
+		surfaceActor = vtk.vtkActor();
+		surfaceActor.SetMapper(mapper);
+
+		self.ren.AddActor(surfaceActor);
+
+	def addVTPFile(self,fname):
+		reader=vtk.vtkXMLPolyDataReader()
+		reader.SetFileName(fname)
+		reader.Update()
+
+		self.boundBox=reader.GetOutput().GetBounds()
+		self.scalarRange=reader.GetOutput().GetPointData().GetScalars().GetRange()
+		self.lut=vtk.vtkLookupTable()
+		self.lut.SetNumberOfTableValues(100)
+		self.lut.SetTableRange(self.scalarRange)
+		self.lut.SetHueRange(0.667, 0.0)
+		self.lut.Build()
+		mapper = vtk.vtkPolyDataMapper();
+		mapper.SetLookupTable(self.lut)
+#		mapper.InterpolateScalarsBeforeMappingOn()
+		mapper.SetInputConnection(reader.GetOutputPort())
+		mapper.SetScalarModeToUsePointData()
+		mapper.ScalarVisibilityOn();
+		mapper.SetScalarRange(self.scalarRange)
+		surfaceActor = vtk.vtkActor();
+		surfaceActor.SetMapper(mapper);
+
+		self.ren.AddActor(surfaceActor);
+
+	def addWidgets(self,opt=None):
+		if opt!=None:
+			if opt.has_key('caption'):
+				self.caption=opt['caption']
+			if opt.has_key('showAxes'):
+				self.showAxes=opt['showAxes']
+			if opt.has_key('showCompass'):
+				self.showCompass=opt['showCompass']
+			if opt.has_key('showScalarBar'):
+				self.showScalarBar=opt['showScalarBar']
+			if opt.has_key('showXYPlane'):
+				self.showXYPlane=opt['showXYPlane']
+			if opt.has_key('showYZPlane'):
+				self.showYZPlane=opt['showYZPlane']
+			if opt.has_key('showZXPlane'):
+				self.showZXPlane=opt['showZXPlane']
+			if opt.has_key('xlabel'):
+				self.xlabel=opt['xlabel']
+			if opt.has_key('ylabel'):
+				self.ylabel=opt['ylabel']
+			if opt.has_key('ylabel'):
+				self.zlabel=opt['zlabel']
+			if opt.has_key('xrange'):
+				self.xrange=opt['xrange']
+			if opt.has_key('yrange'):
+				self.yrange=opt['yrange']
+			if opt.has_key('zrange'):
+				self.zrange=opt['zrange']
+
+
+		prn=1000.
+		pc=-prn
+		plXY = vtk.vtkPlaneSource()
+		plXY.SetPoint1(prn,-prn,0)
+		plXY.SetPoint2(-prn,prn,0)
+		plXY.SetOrigin(pc,pc,0)
+		plXY.SetCenter(0,0,0)
+		plXYmap = vtk.vtkPolyDataMapper()
+		plXYmap.SetInput(plXY.GetOutput())
+		plXYact = vtk.vtkActor()
+		plXYact.SetMapper(plXYmap)
+		plXYact.GetProperty().SetOpacity(0.1)
+
+		plYZ = vtk.vtkPlaneSource()
+		plYZ.SetCenter(0,pc,pc)
+		plYZ.SetPoint1(0,prn,-prn)
+		plYZ.SetPoint2(0,-prn,prn)
+		plYZmap = vtk.vtkPolyDataMapper()
+		plYZmap.SetInput(plYZ.GetOutput())
+		plYZact = vtk.vtkActor()
+		plYZact.SetMapper(plYZmap)
+		plYZact.GetProperty().SetOpacity(0.1)
+
+		plZX = vtk.vtkPlaneSource()
+		plZX.SetCenter(pc,0,pc)
+		plZX.SetPoint1(prn,0,-prn)
+		plZX.SetPoint2(-prn,0,prn)
+		plZXmap = vtk.vtkPolyDataMapper()
+		plZXmap.SetInput(plZX.GetOutput())
+		plZXact = vtk.vtkActor()
+		plZXact.SetMapper(plZXmap)
+		plZXact.GetProperty().SetOpacity(0.1)
+
+		ax=vtk.vtkAxesActor()
+		ax.GetXAxisCaptionActor2D().GetProperty().SetColor(0,0,0)
+		ax.GetYAxisCaptionActor2D().GetProperty().SetColor(0,0,0)
+		ax.GetZAxisCaptionActor2D().GetProperty().SetColor(0,0,0)
+
+		xa=vtk.vtkAxisActor()
+		xa.SetPoint1(0,0,0)
+		xa.SetPoint2(1000,0,0)
+		xa.SetRange((0,1000))
+		xa.SetBounds(-1.0, 1000.0, -1.0, 1.0, -1.0, 1.0)
+
+		self.ow=vtk.vtkOrientationMarkerWidget()
+		textActor = vtk.vtkTextActor()
+		textActor.GetTextProperty().SetFontSize ( 22 )
+		textActor.SetPosition2( 100, 100 )
+		textActor.SetInput(r'DESICOS VIEWER: '+str(self.caption)+r' Scaling: '+str(self.scalingFactor))
+		textActor.GetTextProperty().SetColor ( 0.0,0.0,0.0 )
+	
+
+			
+		if self.showXYPlane:
+			self.ren.AddActor(plXYact)
+		if self.showYZPlane:
+			self.ren.AddActor(plYZact)
+		if self.showZXPlane:
+			self.ren.AddActor(plZXact)
+		if self.showCaption:
+			self.ren.AddActor2D( textActor )
+		if self.showScalarBar:
+			self.scalar_bar = vtk.vtkScalarBarActor()
+			self.scalar_bar.SetOrientationToHorizontal()
+			self.scalar_bar.SetLookupTable(self.lut)
+			self.scalar_bar.SetTitle("Imperfection value");
+			self.scalar_bar.SetNumberOfLabels(11)
+			self.scalar_bar.GetProperty().SetColor ( 0.0,0.0,0.0 )
+			self.scalar_bar_widget = vtk.vtkScalarBarWidget()
+			self.scalar_bar_widget.SetInteractor(self.iren)
+			self.scalar_bar_widget.SetScalarBarActor(self.scalar_bar)
+			self.scalar_bar_widget.On()
+		if self.showCompass:
+			self.ow.SetOrientationMarker(ax)
+			self.ow.SetInteractor(self.iren)
+#			self.ow.SetViewport( 0.0, 0.0, 0.4, 0.4 )
+			self.ow.SetEnabled( 1 )
+			self.ow.InteractiveOn()
+		if self.showAxes:
+			c=vtk.vtkCubeAxesActor()
+			c.SetBounds(self.boundBox)
+			c.SetXTitle(self.xlabel)
+			c.SetYTitle(self.ylabel)
+			c.SetZTitle(self.zlabel)
+
+			if self.xrange != None:
+				c.SetXAxisRange(self.xrange)
+			if self.yrange != None:
+				c.SetYAxisRange(self.yrange)
+			if self.zrange != None:
+				c.SetZAxisRange(self.zrange)
+			c.GetProperty().SetColor(0., 0., 0.)
+			c.SetCamera(self.ren.GetActiveCamera())
+			self.ren.AddActor(c)
+

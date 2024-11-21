@@ -2,6 +2,7 @@ Introduction
 
 1VLM is an implementation of Vortex Lattice Method as described in [1] 
 It is fully implemented in Python, without any external FORTRAN or C library.  It relies on NUMBA to provide reasonable performance.
+![Alt text](doc/intro.png?raw=true "Example aircraft")
 
 Features
 - Steady and unsteady aerodynamic analyses of complex configurations

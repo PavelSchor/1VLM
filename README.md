@@ -5,7 +5,8 @@ It is fully implemented in Python, without any external FORTRAN or C library.  I
 ![Alt text](doc/intro.png?raw=true "Example aircraft")
 
 Features
-- Steady and unsteady aerodynamic analyses of complex configurations
+- Steady and unsteady aerodynamic analyses of complex aircraft configurations
+- flat and cambered surfaces
 - Groups of panels (for loads analyses)
 - Deflections of control surfaces
 - Basic trim algorithm, see example4 (to be coded in FDM later)

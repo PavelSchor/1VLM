@@ -16,5 +16,7 @@ TODO
 - investigate / implement Runge Kutta integration scheme in FDM
 
 References
+
   [1]: J. Katz and A. Plotkin, “Low Speed Aerodynamics,” 2nd Edition, Cambridge University Press, Cambridge, 2001.
+  
   [2]: STEVENS, Brian L. and Frank L. LEWIS. c2003. Aircraft control and simulation. 2nd ed. Hoboken: Wiley. ISBN 0-471-37145-9.

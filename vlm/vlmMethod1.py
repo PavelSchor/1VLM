@@ -45,7 +45,7 @@ def pointInArray(pts,x,tol=1e-5):
 def commonEdgeTwoPanels(A,B):
 	nrows, ncols = A.pts.shape
 	dtype={'names':['f{}'.format(i) for i in range(ncols)], 'formats':ncols * [A.pts.dtype]}
-	C = np.intersect1d(A.pts.view(dtype), B.pts.view(dtype))
+	C = intersect1d(A.pts.view(dtype), B.pts.view(dtype))
 	if len(C) < 2:
 		return False
 	else:
@@ -481,8 +481,8 @@ class VLMDomain(object):
 		m=len(self.AIB)
 		n=m*4##len(self.VORTEXPTS)
 		
-		ia=np.linspace(0,n-1,n,dtype=np.int)
-		ib=np.linspace(1,n,n,dtype=np.int); ib[3::4]=ia[0::4];
+		ia=np.linspace(0,n-1,n,dtype=int)
+		ib=np.linspace(1,n,n,dtype=int); ib[3::4]=ia[0::4];
 		
 		for i in range(0,m):
 			P=self.PTS[i]
@@ -529,14 +529,14 @@ class VLMDomain(object):
 			nt+=self.regions[r].nSpanwise
 			
 		self.wakeNORMALS=np.zeros((nw,3))
-		self.wakeMASK=np.zeros(nt,dtype=np.int)
+		self.wakeMASK=np.zeros(nt,dtype=int)
 		#self.wakeMASKB=np.zeros(nw*4,dtype=bool)
 		self.wakeMASKB=np.zeros(self.nPan,dtype=bool)
 		self.wakeStripMASKI=np.zeros((self.nPan,nw*4),dtype=int)
 		self.wakeStripMASKB=np.zeros((self.nPan,self.nPan*4),dtype=bool)
 
-		self.wakeIA=np.zeros(nw*4,dtype=np.int)
-		self.wakeIB=np.zeros(nw*4,dtype=np.int)
+		self.wakeIA=np.zeros(nw*4,dtype=int)
+		self.wakeIB=np.zeros(nw*4,dtype=int)
 		self.wakePTS=np.zeros((nw*4,3))
 			
 		k=0
@@ -548,8 +548,8 @@ class VLMDomain(object):
 			n=self.regions[r].nWakePanels*4
 			
 			
-			ia=np.linspace(k,k+n-1,n,dtype=np.int)
-			ib=np.linspace(k+1,k+n,n,dtype=np.int); ib[3::4]=ia[0::4];
+			ia=np.linspace(k,k+n-1,n,dtype=int)
+			ib=np.linspace(k+1,k+n,n,dtype=int); ib[3::4]=ia[0::4];
 			self.wakeIA[k:k+n]=ia
 			self.wakeIB[k:k+n]=ib
 			#self.wakeNORMALS[kk:kk+nn]=self.NORMALS[self.regions[r].wakeMask]
@@ -657,8 +657,8 @@ class VLMDomain(object):
 	#def computeWakeContributionCY(self):
 		#def _computeWakeContributionCY(np.ndarray[np.float64_t, ndim=2] AIW,mm,nn,np.ndarray[np.float64_t, ndim=2] PTS,
 				 #np.ndarray[np.float64_t, ndim=2] wakePTS,
-				 #np.ndarray[np.int_t, ndim=1] wakeIA,
-				 #np.ndarray[np.int_t, ndim=1] wakeIB,
+				 #np.ndarray[int_t, ndim=1] wakeIA,
+				 #np.ndarray[int_t, ndim=1] wakeIB,
 				 #np.ndarray[np.float64_t, ndim=2] wakeMASK,
 				 #np.ndarray[np.float64_t, ndim=2] wakeNORMALS):
 			

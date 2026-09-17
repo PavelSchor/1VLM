@@ -1,6 +1,7 @@
 import sys
-sys.path.insert(0, '/usr/local/lib/python2.7/site-packages/')
 
+
+from vlm.env import GlobalEnvironment
 
 from vlm.vlmPanels import VlmPanel
 from numba import jit,prange
@@ -1020,37 +1021,46 @@ class VlmProblem(object):
 		
 		self.vel=np.zeros(3)
 		self.velMagn=1.0
-		self.alpha=0.0
-		self.beta=0.0
+		self.alpha=np.array([0.])
+		self.beta=np.array([0.])
 		self.pressure=1.0	
 		self.dom1=VLMDomain()
 		self.panelGroups={}
 
 	def setAlpha(self,a):
-		self.alpha=a
+		self.alpha[0]=a
 	
 	def setBeta(self,b):
-		self.beta=b
+		self.beta[0]=b
 
 	def setVelocityMagn(self,v):
 		self.velMagn=v
 		vel=np.array([v,0.,0.])
 		a=self.getAlpha()
 		b=self.getBeta()
-		eMatrix=EulerMatrix(0.0,a,b)
+		eMatrix=EulerMatrix(b,a,0)
 		self.setVelocity(eMatrix.transform(vel))
 	
 	def getAlpha(self):
-		return self.alpha
+		return self.alpha[0]
 
 	def getBeta(self):
-		return self.beta
+		return self.beta[0]
 
-	def setVelocity(self,vel):
-		GlobalEnvironment.setFreeVelocity(vel)
+	def getVelocityMagn(self):
+		return np.linalg.norm(self.getVelocity())
+
+	def setVelocity(self,vel=None):
+		if vel is None:
+			self.setVelocityMagn(self.getVelocityMagn())
+			GlobalEnvironment.setFreeVelocity(self.getVelocityMagn())
+		else:
+			GlobalEnvironment.setFreeVelocity(vel)
+			self.dom1.setFreeVelocity(vel)
+
 
 	def getVelocity(self):
-		return self.getFreeVelocity()
+		return self.dom1.getFreeVelocity()
 	
 	def addRegion(self,reg,name=None):
 		self.dom1.addRegion(reg)
